@@ -1,0 +1,124 @@
+name: solution-2-prototype
+
+# Start with the default LEMP recipe
+recipe: lamp
+
+config:
+  # PHP 8.1 for Magento 2.6.6 - adjust as needed
+  php: '8.2'
+  database: mariadb:10.6
+  composer_version: '2.2.21'
+
+proxy:
+  # Set Magento URL
+  appserver1:
+    - solution-2-prototype-cms-staging.lndo.site
+  appserver2:
+    - solution-2-prototype-production.lndo.site
+
+services:
+  appserver1:
+    type: php:8.2
+    via: apache
+    webroot: app-1/pub
+    ssl: true
+    sslExpose: true
+    build_as_root:
+      - apt-get update -y -q 
+      - apt-get install -y libxslt-dev 
+      - docker-php-ext-install sockets 
+      - docker-php-ext-install xsl 
+      - apt-get install cron
+
+  appserver2:
+    type: php:8.2
+    via: apache
+    webroot: app-2/pub
+    ssl: true
+    sslExpose: true
+    build_as_root:
+      - apt-get update -y -q 
+      - apt-get install -y libxslt-dev 
+      - docker-php-ext-install sockets 
+      - docker-php-ext-install xsl 
+      - apt-get install cron
+
+  database-staging:
+    type: mariadb:10.6
+    portforward: true
+    creds: 
+      user: magento1
+      password: magento1
+      database: magento1
+      host: database1
+      port: 3306
+
+  database-production:
+    type: mariadb:10.6
+    portforward: true
+    creds:
+      user: magento2
+      password: magento2
+      database: magento2
+      host: database2
+      port: 3307
+
+  elasticsearch1:
+    type: elasticsearch:7.17.0
+    portforward: true
+
+  elasticsearch2:
+    type: elasticsearch:7.17.0
+    portforward: true
+        
+  mail1:
+    type: mailhog
+    hogfrom:
+      - appserver
+
+  mail2:
+    type: mailhog
+    hogfrom:
+      - appserver
+
+  redis-session1:
+    type: redis:7.0.14-alpine
+    portforward: true
+
+  redis-session2:
+    type: redis:7.0.14-alpine
+    portforward: true
+
+  redis-cache1:
+    type: redis:7.0.14-alpine
+    portforward: true
+
+  redis-cache2:
+    type: redis:7.0.14-alpine
+    portforward: true
+
+tooling:
+  app:build:
+    service: appserver
+    description: Build Magento 2 project 
+    cmd: /app/scripts/app-build.sh
+  
+  app:install:
+    service: appserver
+    description: Install Magento 2 project
+    cmd: /app/scripts/app-install-args.sh
+  
+  app1:install-build:
+    service: appserver1
+    description: Build and install Magento 2 project
+    cmd: /app/scripts/app-1/app-install-build.sh
+
+  app2:install-build:
+    service: appserver2
+    description: Build and install Magento 2 project
+    cmd: /app/scripts/app-2/app-install-build-2.sh
+
+  magento:
+    service: appserver
+    description: Run Magento 2 CLI commands
+    cmd: /app/magento/bin/magento
